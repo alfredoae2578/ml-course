@@ -1,0 +1,537 @@
+\documentclass[11pt,a4paper]{article}
+
+% ---------- Paquetes ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-noshorthands,es-tabla]{babel}
+\usepackage{lmodern}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage[dvipsnames]{xcolor}
+\usepackage[most]{tcolorbox}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage[hidelinks]{hyperref}
+
+% ---------- Estilo ----------
+\definecolor{azul}{HTML}{1F4E79}
+\definecolor{azulclaro}{HTML}{E8F0F8}
+\definecolor{ambar}{HTML}{FFF4E0}
+\definecolor{ambarborde}{HTML}{E0A030}
+\definecolor{verdeclaro}{HTML}{E9F5EC}
+\definecolor{verdeborde}{HTML}{3C8D50}
+
+\titleformat{\section}{\Large\bfseries\color{azul}}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries\color{azul}}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{}{0em}{}
+
+\setlist{itemsep=2pt, topsep=4pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\renewcommand{\arraystretch}{1.25}
+
+\newcommand{\col}[1]{\texttt{#1}}
+
+\newtcolorbox{nota}{colback=azulclaro, colframe=azul, boxrule=0.6pt,
+  arc=2pt, left=6pt, right=6pt, top=4pt, bottom=4pt}
+\newtcolorbox{aviso}{colback=ambar, colframe=ambarborde, boxrule=0.6pt,
+  arc=2pt, left=6pt, right=6pt, top=4pt, bottom=4pt}
+\newtcolorbox{preguntas}{colback=verdeclaro, colframe=verdeborde, boxrule=0.6pt,
+  arc=2pt, left=6pt, right=6pt, top=4pt, bottom=4pt,
+  title={\textbf{Preguntas}}, coltitle=white, colbacktitle=verdeborde}
+
+\newlist{checklist}{itemize}{1}
+\setlist[checklist]{label=$\square$}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small Curso de Machine Learning}
+\rhead{\small Capítulo 3 · Proyecto Titanic}
+\cfoot{\small\thepage}
+
+% ---------- Documento ----------
+\begin{document}
+
+\begin{center}
+  {\small\color{azul} CURSO DE MACHINE LEARNING · CAPÍTULO 3}\\[4pt]
+  {\LARGE\bfseries Proyecto: preparar los datos del Titanic}\\[4pt]
+  {\large Análisis exploratorio, limpieza, transformación y escalado}
+\end{center}
+
+\vspace{4pt}
+
+El 15 de abril de 1912 el Titanic se hundió en su viaje inaugural. De las 891 personas
+de este dataset, solo sobrevivió un 38\,\%. ¿Fue cuestión de suerte, o hubo factores
+(sexo, edad, clase del billete\ldots) que influyeron en quién se salvó?
+
+En el próximo capítulo vas a entrenar tu \textbf{primer modelo} para responder esa
+pregunta: predecir si un pasajero sobrevivió (\col{survived}). Pero un modelo solo es
+tan bueno como los datos con los que aprende. En este proyecto vas a hacer el trabajo
+que ocupa la mayor parte del tiempo de cualquier científico de datos:
+\textbf{entender, limpiar y preparar los datos}.
+
+\begin{aviso}
+\textbf{Este documento no tiene código.} Tú decides cómo resolver cada paso con lo que
+aprendiste en el capítulo 3 (NumPy, pandas, matplotlib, limpieza, outliers,
+transformación, codificación y escalado).
+\end{aviso}
+
+% =====================================================================
+\section*{Objetivos}
+
+Al terminar el proyecto serás capaz de:
+\begin{enumerate}
+  \item Hacer un \textbf{análisis exploratorio} (EDA) de un dataset real y sacar conclusiones de él.
+  \item Detectar problemas de calidad: duplicados, valores faltantes, columnas redundantes y outliers.
+  \item \textbf{Tomar decisiones de limpieza y justificarlas} por escrito. Esta es la parte más importante.
+  \item Transformar, codificar y escalar las variables.
+  \item Dejar los datos \textbf{listos para entrenar un modelo}, separados en train y test.
+\end{enumerate}
+
+% =====================================================================
+\section*{Entregables}
+
+\begin{tabularx}{\textwidth}{@{}l l X@{}}
+\toprule
+\textbf{Entregable} & \textbf{Dónde} & \textbf{Descripción} \\
+\midrule
+Notebook del proyecto & Carpeta \col{workspace/} &
+  \col{workspace/chapter\_03/proyecto\_titanic.ipynb}: todo tu análisis, de principio a
+  fin, con celdas de Markdown que expliquen lo que haces. \\
+Bitácora de decisiones & Sección final del notebook &
+  Una tabla con \textbf{cada decisión} de limpieza y transformación que tomaste y \textbf{por qué}. \\
+Conclusiones & Sección final del notebook &
+  Un resumen de lo que aprendiste de los datos y de cómo quedaron preparados. \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+Reglas del notebook (las mismas de siempre):
+\begin{itemize}
+  \item Trabaja \textbf{solo} dentro de \col{workspace/}. No modifiques archivos del curso.
+  \item Tiene que funcionar con \textbf{Restart \& Run All}, de arriba abajo, con todos los imports al principio.
+  \item Usa rutas relativas para leer los datos (\col{data/titanic.csv}).
+  \item Fija las semillas aleatorias (\col{random\_state=42}).
+  \item Escribe en Markdown \textbf{qué} haces y \textbf{por qué} antes o después de cada bloque de código.
+        Un notebook solo con código no se considera completo.
+  \item Limpia las salidas antes de hacer commit.
+\end{itemize}
+
+% =====================================================================
+\section*{Los datos}
+
+Si aún no tienes el archivo \col{data/titanic.csv}, descárgalo con el script del curso
+(\col{scripts/download\_data.py}). El dataset tiene \textbf{891 filas y 15 columnas}.
+Cada fila es un pasajero.
+
+\begin{tabularx}{\textwidth}{@{}l X@{}}
+\toprule
+\textbf{Columna} & \textbf{Descripción} \\
+\midrule
+\col{survived}    & ¿Sobrevivió? (0 = no, 1 = sí). \textbf{Es la variable objetivo.} \\
+\col{pclass}      & Clase del billete (1 = primera, 2 = segunda, 3 = tercera). \\
+\col{sex}         & Sexo del pasajero. \\
+\col{age}         & Edad en años. \\
+\col{sibsp}       & Número de hermanos o cónyuges a bordo. \\
+\col{parch}       & Número de padres o hijos a bordo. \\
+\col{fare}        & Precio del billete (en libras de la época). \\
+\col{embarked}    & Puerto de embarque (C = Cherbourg, Q = Queenstown, S = Southampton). \\
+\col{class}       & Clase del billete, en texto. \\
+\col{who}         & ¿Hombre, mujer o niño? \\
+\col{adult\_male} & ¿Es un hombre adulto? \\
+\col{deck}        & Cubierta del camarote. \\
+\col{embark\_town}& Puerto de embarque, en texto. \\
+\col{alive}       & ¿Sobrevivió?, en texto. \\
+\col{alone}       & ¿Viajaba solo? \\
+\bottomrule
+\end{tabularx}
+
+\begin{nota}
+Lee bien esta tabla antes de empezar. Algunas columnas esconden sorpresas que tendrás
+que descubrir en la fase~1.
+\end{nota}
+
+% =====================================================================
+\section{Primer contacto con los datos}
+
+Antes de cambiar nada, \textbf{mira}. El objetivo de esta fase es conocer el dataset,
+no arreglarlo.
+
+\subsubsection*{Tareas}
+\begin{enumerate}
+  \item Carga el dataset y muestra las primeras y las últimas filas.
+  \item Averigua cuántas filas y columnas tiene, y el tipo de dato de cada columna.
+  \item Obtén un resumen estadístico de las columnas numéricas y otro de las categóricas.
+  \item Cuenta los valores faltantes por columna, en número y en porcentaje.
+  \item Cuenta cuántas filas están duplicadas.
+  \item Para cada columna categórica, mira cuántos valores distintos tiene y cuáles son.
+\end{enumerate}
+
+\begin{preguntas}
+\begin{itemize}
+  \item ¿Qué tipo de problema de Machine Learning es este: regresión o clasificación? ¿Por qué?
+  \item ¿Qué columnas son numéricas y cuáles categóricas? ¿Hay alguna numérica que en
+        realidad se comporte como categórica? ¿Alguna categórica que tenga un
+        \textbf{orden} natural?
+  \item ¿Qué columnas tienen valores faltantes? ¿Cuál te preocupa más y por qué?
+  \item ¿Ves columnas que parezcan decir \textbf{lo mismo} que otra? Haz una lista de esas
+        parejas y comprueba con los datos si de verdad contienen la misma información.
+  \item Mira la columna \col{alive}. ¿Qué pasaría si se la dieras a un modelo que tiene
+        que predecir \col{survived}? ¿Ese modelo serviría en la vida real?
+\end{itemize}
+\end{preguntas}
+
+% =====================================================================
+\section{Análisis exploratorio (EDA)}
+
+Ahora toca hacer preguntas a los datos con gráficas y tablas. Cada gráfica debe ir
+acompañada de \textbf{una o dos frases} con lo que observas. Una gráfica sin
+interpretación no cuenta.
+
+\subsection{La variable objetivo}
+\begin{itemize}
+  \item ¿Qué porcentaje de pasajeros sobrevivió? Represéntalo con una gráfica.
+  \item ¿Las clases están equilibradas? ¿Por qué podría importar esto cuando entrenes un modelo?
+\end{itemize}
+
+\subsection{Variables una a una (análisis univariado)}
+\begin{itemize}
+  \item Haz un histograma de \col{age} y otro de \col{fare}. Describe su forma: ¿son
+        simétricas o asimétricas?
+  \item Haz un diagrama de caja (\emph{boxplot}) de \col{age} y otro de \col{fare}.
+        ¿Ves puntos alejados del resto?
+  \item Haz gráficas de barras de \col{sex}, \col{pclass} y \col{embarked}. ¿Qué
+        categoría domina en cada una?
+  \item Mira la distribución de \col{sibsp} y \col{parch}. ¿Qué es lo más habitual?
+\end{itemize}
+
+\subsection{Variables frente a la supervivencia (análisis bivariado)}
+\begin{itemize}
+  \item ¿Qué porcentaje sobrevivió según el \textbf{sexo}? ¿Y según la \textbf{clase}?
+  \item ¿Sobrevivieron más los niños que los adultos? Compara la distribución de
+        \col{age} entre los que sobrevivieron y los que no.
+  \item ¿Los billetes más caros tenían más probabilidad de sobrevivir?
+  \item ¿Influyó el puerto de embarque? Antes de concluir nada, mira qué clase de billete
+        compraba la gente en cada puerto. ¿Puede ser que el puerto no importe y lo que
+        importe sea otra cosa?
+  \item ¿Viajar solo te ayudaba o te perjudicaba?
+  \item Combina dos variables: ¿cómo fue la supervivencia de las mujeres de tercera clase
+        comparada con la de los hombres de primera?
+\end{itemize}
+
+\begin{preguntas}
+\begin{itemize}
+  \item Si tuvieras que adivinar si un pasajero sobrevivió \textbf{conociendo solo una
+        columna}, ¿cuál elegirías? Justifícalo con tus gráficas.
+  \item Escribe \textbf{tres hallazgos} del EDA que te hayan llamado la atención.
+  \item ¿Hay algo en el EDA que te haga sospechar de errores en los datos?
+\end{itemize}
+\end{preguntas}
+
+% =====================================================================
+\section{Limpieza de datos}
+
+\begin{aviso}
+\textbf{Esta es la fase más importante del proyecto.} Casi nunca hay una única respuesta
+correcta: lo que se evalúa es que \textbf{tomes una decisión, la justifiques y midas su
+efecto}.
+\end{aviso}
+
+Para cada decisión, anota en tu bitácora (ver más abajo):
+\begin{itemize}
+  \item \textbf{Qué} problema encontraste.
+  \item \textbf{Qué opciones} tenías.
+  \item \textbf{Cuál elegiste y por qué.}
+  \item \textbf{Cuántas filas o valores} se vieron afectados.
+\end{itemize}
+
+Antes de empezar, \textbf{guarda una copia} de los datos originales. Al final de la fase
+compararás el antes y el después.
+
+\subsection{Columnas redundantes y fuga de información}
+
+En la fase~1 encontraste columnas que repiten información, y al menos una que
+``chiva'' la respuesta.
+\begin{itemize}
+  \item Decide qué columnas eliminas y cuáles conservas de cada pareja redundante.
+        ¿Con qué criterio eliges cuál quedarte?
+  \item \col{who} y \col{adult\_male} se calcularon a partir de \col{sex} y \col{age}.
+        ¿Te aportan algo nuevo? ¿Las conservarías?
+  \item Explica con tus palabras qué es la \textbf{fuga de información}
+        (\emph{data leakage}) y qué columna(s) la provocan aquí.
+\end{itemize}
+
+\subsection{Duplicados}
+
+El dataset tiene filas duplicadas. Pero ojo: este dataset \textbf{no tiene el nombre ni el
+número de billete} de cada pasajero.
+\begin{itemize}
+  \item ¿Esas filas son errores (la misma persona registrada dos veces) o pueden ser
+        \textbf{personas distintas} que comparten las mismas características?
+  \item Piensa en un ejemplo concreto: dos hombres de tercera clase, de 20 años, que
+        viajan solos, embarcaron en Southampton y pagaron lo mismo. ¿Es posible?
+  \item Decide si eliminas los duplicados o no, y justifícalo. ¿Qué perderías si te
+        equivocas en cada caso?
+\end{itemize}
+
+\subsection{Valores faltantes}
+
+Trata cada columna con faltantes por separado.
+
+\subsubsection*{\col{deck}}
+\begin{itemize}
+  \item ¿Qué porcentaje de valores le falta?
+  \item ¿Tiene sentido imputar una columna a la que le faltan tantos datos? ¿Qué opciones
+        tienes: eliminarla, imputarla, crear una categoría ``desconocido'', crear un
+        indicador de si se conoce la cubierta\ldots?
+  \item Antes de decidir: ¿el hecho de que falte la cubierta tiene relación con la
+        supervivencia o con la clase? Compruébalo. ¿Cambia eso tu decisión?
+\end{itemize}
+
+\subsubsection*{\col{age}}
+\begin{itemize}
+  \item ¿Cuántos valores faltan? ¿Eliminar esas filas sería buena idea? ¿Cuántos datos perderías?
+  \item ¿Imputarías con la media o con la mediana? Mira la forma de la distribución para decidir.
+  \item ¿Sería mejor imputar por grupos (por ejemplo, la mediana de edad según la clase,
+        el sexo o ambos)? Compara las medianas de cada grupo: ¿son parecidas o muy distintas?
+  \item ¿Vale la pena crear una columna indicadora de ``edad desconocida''? ¿Por qué
+        podría ayudar al modelo?
+  \item Después de imputar, vuelve a hacer el histograma de \col{age}. ¿Cómo cambió la
+        distribución? ¿Ves algún efecto raro?
+\end{itemize}
+
+\subsubsection*{\col{embarked}}
+\begin{itemize}
+  \item Solo faltan unos pocos valores. ¿Qué harías y por qué?
+  \item ¿La moda es una opción razonable aquí?
+\end{itemize}
+
+\subsection{Outliers}
+
+Para \col{fare}, \col{age}, \col{sibsp} y \col{parch}:
+\begin{enumerate}
+  \item Detecta posibles outliers con al menos \textbf{dos métodos} vistos en clase (por
+        ejemplo, IQR y Z-score). ¿Cuántos encuentra cada método? ¿Coinciden?
+  \item Para cada caso, pregúntate: ¿es un \textbf{error} o es un valor \textbf{raro pero real}?
+\end{enumerate}
+
+\begin{preguntas}
+\begin{itemize}
+  \item \col{fare}: hay billetes de más de 500 libras. ¿Es un error o había pasajeros muy
+        ricos? ¿Cómo lo comprobarías con los propios datos (por ejemplo, mirando su clase)?
+  \item \col{fare}: hay billetes que costaron \textbf{0}. ¿Qué pudo pasar? ¿Es un error,
+        un valor faltante disfrazado, o puede ser real (tripulación, invitados\ldots)?
+        ¿Qué harías con ellos?
+  \item \col{age}: hay edades con decimales y menores de 1 año. ¿Son errores?
+  \item \col{sibsp}: algunos pasajeros tienen 8 hermanos o cónyuges a bordo. ¿Es posible?
+        ¿Qué te dice eso de la familia?
+  \item ¿Por qué el método de Z-score puede fallar con una variable tan asimétrica como \col{fare}?
+  \item Elige un tratamiento para cada variable: no hacer nada, eliminar filas, winsorizar
+        (\emph{capping}) o transformar. Justifícalo.
+\end{itemize}
+\end{preguntas}
+
+\begin{nota}
+Recuerda lo que vimos en clase: un outlier \textbf{no es automáticamente un error}.
+Eliminar datos reales puede hacer que el modelo aprenda un mundo que no existe.
+\end{nota}
+
+\subsection{Antes y después}
+\begin{itemize}
+  \item Compara el dataset original con el limpio: número de filas, de columnas y de
+        valores faltantes.
+  \item Compara las distribuciones de \col{age} y \col{fare} antes y después de la limpieza.
+  \item ¿Cambió el porcentaje de supervivientes después de limpiar? Si cambió, ¿por qué?
+        ¿Es un problema?
+\end{itemize}
+
+% =====================================================================
+\section{Transformación, codificación y escalado}
+
+Con los datos limpios, prepáralos para que un modelo pueda usarlos. Un modelo solo
+entiende \textbf{números}.
+
+\subsection{Crear variables nuevas (\emph{feature engineering})}
+
+Crea \textbf{al menos dos} variables nuevas a partir de las que ya tienes. Algunas ideas
+para que pienses (no tienes que hacerlas todas):
+\begin{itemize}
+  \item El \textbf{tamaño de la familia} a bordo, a partir de \col{sibsp} y \col{parch}.
+  \item \textbf{Tramos de edad} (niño, adolescente, adulto, mayor). ¿Dónde pondrías los
+        cortes y por qué?
+  \item Si conservaste algo de \col{deck}, ¿qué información útil puedes extraer?
+\end{itemize}
+Para cada variable nueva:
+\begin{itemize}
+  \item Explica por qué crees que puede ayudar a predecir la supervivencia.
+  \item Compruébalo con una gráfica o tabla frente a \col{survived}.
+\end{itemize}
+
+\subsection{Transformar variables asimétricas}
+\begin{itemize}
+  \item ¿Qué variables numéricas son muy asimétricas?
+  \item Aplica una transformación logarítmica a la que lo necesite. Compara el histograma
+        antes y después.
+  \item ¿Qué problema tendrías al aplicar un logaritmo si la variable tiene valores 0?
+        ¿Cómo lo resuelves?
+\end{itemize}
+
+\subsection{Codificar las variables categóricas}
+
+Para cada variable categórica que conserves:
+\begin{itemize}
+  \item ¿Es \textbf{nominal} (sin orden) u \textbf{ordinal} (con orden)?
+  \item ¿Qué codificación usarías: one-hot u ordinal? ¿Por qué?
+  \item \col{pclass} ya es un número. ¿Lo dejas así o lo codificas con one-hot? Piensa en
+        qué le ``dice'' cada opción al modelo. ¿Es la diferencia entre primera y segunda
+        clase igual que entre segunda y tercera?
+  \item Las columnas booleanas (\col{alone}, \col{adult\_male}, si las conservas),
+        ¿necesitan alguna codificación?
+  \item En one-hot, ¿qué significa eliminar una de las columnas (\col{drop="first"})?
+        ¿Cuándo tiene sentido?
+\end{itemize}
+
+\subsection{Separar en train y test}
+\begin{itemize}
+  \item Separa los datos en entrenamiento (80\,\%) y prueba (20\,\%), con \col{random\_state=42}.
+  \item Como las clases no están equilibradas, investiga qué significa hacer una separación
+        \textbf{estratificada}. ¿Debería mantenerse el mismo porcentaje de supervivientes
+        en train y en test? Compruébalo.
+\end{itemize}
+
+\begin{aviso}
+\textbf{Pregunta clave:} ¿en qué orden deben ir la separación y el escalado? ¿Y la
+imputación? ¿Qué pasa si calculas la mediana de \col{age} o la media de \col{fare} con
+\textbf{todos} los datos, incluidos los de test? Relaciónalo con la fuga de información
+de la fase~3.
+\end{aviso}
+
+\subsection{Escalar las variables numéricas}
+\begin{itemize}
+  \item ¿Qué variables necesitan escalarse? ¿Y cuáles no?
+  \item ¿Usarías estandarización (\col{StandardScaler}) o normalización
+        (\col{MinMaxScaler})? Justifícalo según la forma de cada variable y la presencia
+        de outliers.
+  \item ¿Por qué el escalador se ajusta (\col{fit}) \textbf{solo con train} y luego se
+        aplica a test?
+  \item ¿Escalarías también las columnas que salen del one-hot? ¿Por qué?
+\end{itemize}
+
+\subsection{Todo junto (opcional, recomendado)}
+
+Reúne la imputación, la codificación y el escalado en un \col{ColumnTransformer} dentro de
+un \col{Pipeline}, como vimos en clase.
+\begin{itemize}
+  \item ¿Qué ventaja tiene esto frente a hacerlo todo paso a paso?
+  \item Imagina que mañana llega un pasajero nuevo. ¿Qué tendrías que hacer para
+        prepararlo con tu solución paso a paso? ¿Y con el pipeline?
+\end{itemize}
+
+\subsection{Comprobación final}
+
+Antes de terminar, verifica que:
+\begin{checklist}
+  \item No queda \textbf{ningún} valor faltante en \col{X\_train} ni en \col{X\_test}.
+  \item Todas las columnas son \textbf{numéricas}.
+  \item \col{X\_train} y \col{X\_test} tienen \textbf{las mismas columnas}, en el mismo orden.
+  \item La variable objetivo \col{survived} \textbf{no} está dentro de \col{X}, ni ninguna
+        columna que la revele.
+  \item Las variables numéricas escaladas tienen la media y la desviación (o el mínimo y
+        el máximo) que esperabas en train.
+  \item El notebook funciona con \textbf{Restart \& Run All}.
+\end{checklist}
+
+Muestra la forma final (\col{shape}) de \col{X\_train}, \col{X\_test}, \col{y\_train} e
+\col{y\_test}, y las primeras filas de \col{X\_train}.
+
+% =====================================================================
+\section*{Bitácora de decisiones}
+
+Al final del notebook, incluye una tabla en Markdown con \textbf{todas} tus decisiones.
+Este es el formato:
+
+{\small
+\begin{tabularx}{\textwidth}{@{}c l X X l X l@{}}
+\toprule
+\textbf{\#} & \textbf{Columna} & \textbf{Problema} & \textbf{Opciones} &
+\textbf{Decisión} & \textbf{Justificación} & \textbf{Afectados} \\
+\midrule
+1 & \col{ejemplo} & 5\,\% de valores faltantes & Eliminar filas, media, mediana &
+  Mediana & La distribución es asimétrica; la media se ve arrastrada por valores altos &
+  45 valores \\
+2 & \ldots & \ldots & \ldots & \ldots & \ldots & \ldots \\
+\bottomrule
+\end{tabularx}
+}
+
+\medskip
+Debe tener, como mínimo, una fila por cada:
+\begin{itemize}
+  \item Columna eliminada.
+  \item Decisión sobre duplicados.
+  \item Columna con valores faltantes.
+  \item Variable revisada por outliers.
+  \item Variable nueva creada.
+  \item Transformación, codificación y escalado aplicados.
+\end{itemize}
+
+% =====================================================================
+\section*{Conclusiones}
+
+Termina el notebook con una sección de conclusiones que responda:
+\begin{enumerate}
+  \item ¿Qué tres factores crees que más influyeron en la supervivencia? Apóyate en tu EDA.
+  \item ¿Cuál fue la decisión de limpieza \textbf{más difícil} que tomaste? ¿Qué te hizo dudar?
+  \item Si un compañero hubiera tomado una decisión distinta en esa misma situación,
+        ¿cómo crees que afectaría al modelo?
+  \item ¿Qué información te hubiera gustado tener que no está en el dataset?
+  \item ¿Con cuántas filas y columnas terminaste? ¿Qué columnas va a ver el modelo?
+\end{enumerate}
+
+% =====================================================================
+\section*{Cómo se evalúa}
+
+\begin{tabularx}{\textwidth}{@{}l c X@{}}
+\toprule
+\textbf{Criterio} & \textbf{Peso} & \textbf{Qué se busca} \\
+\midrule
+Exploración (fases 1 y 2) & 20\,\% &
+  Gráficas adecuadas, \textbf{cada una interpretada}; preguntas respondidas. \\
+Limpieza y decisiones (fase 3) & 35\,\% &
+  Decisiones \textbf{justificadas con datos}, efecto de cada una medido, comparación antes/después. \\
+Transformación y escalado (fase 4) & 25\,\% &
+  Codificación y escalado correctos, separación train/test sin fuga de información. \\
+Bitácora y conclusiones & 15\,\% &
+  Bitácora completa y clara; conclusiones con argumentos. \\
+Calidad del notebook & 5\,\% &
+  Funciona con \emph{Restart \& Run All}, ordenado, con Markdown explicativo. \\
+\bottomrule
+\end{tabularx}
+
+\begin{nota}
+\textbf{No existe ``la'' limpieza correcta del Titanic.} Dos notebooks con decisiones
+distintas pueden tener la máxima nota si ambas están bien justificadas. Lo que no vale es
+tomar una decisión sin explicar por qué.
+\end{nota}
+
+% =====================================================================
+\section*{Si te atascas}
+\begin{itemize}
+  \item Repasa los notebooks de clase del capítulo 3, en especial
+        \col{04\_limpieza\_y\_outliers} y \col{05\_transformacion\_y\_escalado}.
+  \item La actividad \col{04\_actividad\_decisiones\_preprocesamiento} tiene casos muy
+        parecidos a los de este proyecto.
+  \item Si usas un asistente de IA, pídele \textbf{pistas y explicaciones}, no la solución
+        completa. Las decisiones del proyecto tienen que ser tuyas.
+\end{itemize}
+
+\subsection*{¿Qué sigue?}
+
+En el capítulo 4 usarás los datos que preparaste aquí para entrenar tu primer modelo de
+clasificación. Guarda bien tu notebook: ¡lo vas a necesitar!
+
+\end{document}
